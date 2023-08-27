@@ -2,25 +2,32 @@
 
 use std::fmt::format;
 use std::net::SocketAddr;
-use axum::{Json, Router, Server, routing::{get, get_service}, response::{Html, IntoResponse, Response}, extract::{Path, Query}, middleware};
+
+use axum::{extract::{Path, Query}, Json, middleware, response::{Html, IntoResponse, Response}, Router, routing::{get, get_service}, Server};
 use serde::Deserialize;
+use tower_cookies::CookieManagerLayer;
 use tower_http::services::ServeDir;
 
+use crate::model::ModelController;
+
+pub use self::error::{Error, Result};
 
 mod error;
-
-// pub use self::error::{Error, Result};
-pub use self::error::{Error};
-
+mod model;
 mod web;
 
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
+    // Initialize ModelController.
+    let mc = ModelController::new().await?;
+
     let route_all = Router::new()
         .merge(routes_hello())
         .merge(web::routes_login::routes())
+        .nest("/api", web::routes_tickets::routes(mc.clone()))
         .layer(middleware::map_response(main_response_mapper))
+        .layer(CookieManagerLayer::new())
         .fallback_service(route_static());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3030));
@@ -30,6 +37,8 @@ async fn main() {
         .serve(route_all.into_make_service())
         .await
         .expect("Failed to start server");
+
+    Ok(())
 }
 
 async fn main_response_mapper(res: Response) -> Response {
