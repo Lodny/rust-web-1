@@ -8,10 +8,12 @@ use serde::Deserialize;
 use tower_cookies::CookieManagerLayer;
 use tower_http::services::ServeDir;
 
+use crate::ctx::Ctx;
 use crate::model::ModelController;
 
 pub use self::error::{Error, Result};
 
+mod ctx;
 mod error;
 mod model;
 mod web;
@@ -30,6 +32,10 @@ async fn main() -> Result<()> {
         .merge(web::routes_login::routes())
         .nest("/api", routes_apis)
         .layer(middleware::map_response(main_response_mapper))
+        .layer(middleware::from_fn_with_state(
+            mc.clone(),
+            web::mw_auth::mw_ctx_resolver,
+        ))
         .layer(CookieManagerLayer::new())
         .fallback_service(route_static());
 
