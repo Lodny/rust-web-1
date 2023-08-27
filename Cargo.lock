@@ -878,14 +878,14 @@ dependencies = [
 name = "rust-web-1"
 version = "0.1.0"
 dependencies = [
-    "anyhow",
-    "axum",
-    "httpc-test",
-    "serde",
-    "serde_json",
-    "tokio",
-    "tower-cookies",
-    "tower-http",
+ "anyhow",
+ "axum",
+ "httpc-test",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower-cookies",
+ "tower-http",
 ]
 
 [[package]]

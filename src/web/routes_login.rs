@@ -4,11 +4,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::{Cookie, Cookies};
 
-// use crate::{Error, Result};
-use crate::{Error, web};
-
-pub type Result<T> = core::result::Result<T, Error>;
-
+use crate::{Error, Result, web};
 
 pub fn routes() -> Router {
     Router::new().route("/api/login", post(api_login))
