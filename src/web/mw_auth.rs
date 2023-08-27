@@ -1,14 +1,15 @@
 use axum::{async_trait, RequestPartsExt};
-use axum::extract::FromRequestParts;
+use axum::extract::{FromRequestParts, State};
 use axum::http::Request;
 use axum::http::request::Parts;
 use axum::middleware::Next;
 use axum::response::Response;
 use lazy_regex::regex_captures;
-use tower_cookies::Cookies;
+use tower_cookies::{Cookie, Cookies};
 
 use crate::{Error, Result};
 use crate::ctx::Ctx;
+use crate::model::ModelController;
 use crate::web::AUTH_TOKEN;
 
 pub async fn mw_require_auth<B>(
@@ -23,6 +24,39 @@ pub async fn mw_require_auth<B>(
     Ok(next.run(req).await)
 }
 
+pub async fn mw_ctx_resolver<B>(
+    _mc: State<ModelController>,
+    cookies: Cookies,
+    mut req: Request<B>,
+    next: Next<B>,
+) -> Result<Response> {
+    println!("->> {:<12} - mw_ctx_resolver", "MIDDLEWARE");
+
+    // User the cookies extractor.
+    let auth_token = cookies.get(AUTH_TOKEN).map(|c| c.value().to_string());
+
+    // Compute Result<Ctx>.
+    let result_ctx = match auth_token
+        .ok_or(Error::AuthFailNoAuthTokenCookie)
+        .and_then(parse_token) {
+        Ok((user_id, _exp, _sign)) => {
+            // TODO: Token validations.
+            Ok(Ctx::new(user_id))
+        }
+        Err(e) => Err(e),
+    };
+
+    // Remove the cookie if something went wrong than NoAuthTokenCookie.
+    if result_ctx.is_err() && !matches!(result_ctx, Err(Error::AuthFailNoAuthTokenCookie)) {
+        cookies.remove(Cookie::named(AUTH_TOKEN))
+    }
+
+    // Store the ctx_result in the request extension.
+    req.extensions_mut().insert(result_ctx);
+
+    Ok(next.run(req).await)
+}
+
 // region:      --- Ctx Extractor
 #[async_trait]
 impl<S: Send + Sync> FromRequestParts<S> for Ctx {
@@ -31,17 +65,10 @@ impl<S: Send + Sync> FromRequestParts<S> for Ctx {
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self> {
         println!("->> {:<12} - Ctx", "EXTRACTOR");
 
-        // User the cookies extractor.
-        let cookies = parts.extract::<Cookies>().await.unwrap();
-
-        let auth_token = cookies.get(AUTH_TOKEN).map(|c| c.value().to_string());
-        // println!(">>> mw_require_auth : {:?}", auth_token);
-
-        let (user_id, exp, sign) = auth_token
-            .ok_or(Error::AuthFailNoAuthTokenCookie)
-            .and_then(parse_token)?;
-
-        Ok(Ctx::new(user_id))
+        parts.extensions
+            .get::<Result<Ctx>>()
+            .ok_or(Error::AuthFailCtxNotInRequestExt)?
+            .clone()
     }
 }
 // endregion:   --- Ctx Extractor
