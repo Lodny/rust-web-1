@@ -43,9 +43,6 @@ async fn main() -> Result<()> {
         .await
         .expect("Failed to start server");
 
-    let ctx = Ctx::new(10);
-    ctx.user_id()
-
     Ok(())
 }
 
