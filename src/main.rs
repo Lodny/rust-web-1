@@ -2,15 +2,16 @@
 
 use std::fmt::format;
 use std::net::SocketAddr;
-use axum::{Json, Router, Server, routing::{get, get_service}, response::{Html, IntoResponse, Response}, extract::{Path, Query}, middleware};
+
+use axum::{extract::{Path, Query}, Json, middleware, response::{Html, IntoResponse, Response}, Router, routing::{get, get_service}, Server};
 use serde::Deserialize;
+use tower_cookies::CookieManagerLayer;
 use tower_http::services::ServeDir;
 
+// pub use self::error::{Error, Result};
+pub use self::error::Error;
 
 mod error;
-
-// pub use self::error::{Error, Result};
-pub use self::error::{Error};
 
 mod web;
 
@@ -21,6 +22,7 @@ async fn main() {
         .merge(routes_hello())
         .merge(web::routes_login::routes())
         .layer(middleware::map_response(main_response_mapper))
+        .layer(CookieManagerLayer::new())
         .fallback_service(route_static());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3030));
